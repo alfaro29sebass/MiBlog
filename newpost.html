@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nuevo Post - Mi Blog</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main style="max-width:700px;margin:2rem auto">
+    <h1>Nuevo Post</h1>
+
+    <p>Este formulario te permite publicar directamente en tu blog de GitHub.</p>
+
+    <label>Título:<br>
+      <input id="title" type="text" style="width:100%;padding:6px">
+    </label><br><br>
+
+    <label>Extracto (breve descripción):<br>
+      <textarea id="excerpt" rows="2" style="width:100%;padding:6px"></textarea>
+    </label><br><br>
+
+    <label>Contenido (Markdown):<br>
+      <textarea id="body" rows="10" style="width:100%;padding:6px"></textarea>
+    </label><br><br>
+
+    <button id="publish">Publicar</button>
+
+    <p id="msg"></p>
+  </main>
+
+  <script>
+    const repo = "alfaro29sebass/MiBlog"; // 🔸 cambia esto
+    const branch = "main";
+
+    async function createFile(path, content, message) {
+      const token = prompt("Pega tu token de GitHub aquí:");
+      if (!token) return alert("Token requerido para publicar.");
+
+      const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Accept": "application/vnd.github.v3+json"
+        },
+        body: JSON.stringify({
+          message,
+          content: btoa(unescape(encodeURIComponent(content))),
+          branch
+        })
+      });
+      return res;
+    }
+
+    document.getElementById("publish").onclick = async () => {
+      const title = document.getElementById("title").value.trim();
+      const excerpt = document.getElementById("excerpt").value.trim();
+      const body = document.getElementById("body").value.trim();
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+      if (!title || !body) return alert("Falta el título o el contenido.");
+
+      const date = new Date().toISOString().slice(0,10);
+      const author = "TU_NOMBRE"; // cámbialo si quieres
+      const md = `---\ntitle: "${title}"\ndate: "${date}"\nauthor: "${author}"\n---\n\n${body}\n`;
+
+      const res = await createFile(`posts/${slug}.md`, md, `Nuevo post: ${title}`);
+      const msg = document.getElementById("msg");
+
+      if (res.ok) {
+        msg.textContent = "✅ Post publicado con éxito.";
+      } else {
+        const data = await res.json();
+        msg.textContent = "❌ Error: " + (data.message || "No se pudo publicar.");
+      }
+    };
+  </script>
+</body>
+</html>
