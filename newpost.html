@@ -9,7 +9,6 @@
 <body>
   <main style="max-width:700px;margin:2rem auto">
     <h1>Nuevo Post</h1>
-
     <p>Este formulario te permite publicar directamente en tu blog de GitHub.</p>
 
     <label>Título:<br>
@@ -25,17 +24,36 @@
     </label><br><br>
 
     <button id="publish">Publicar</button>
-
     <p id="msg"></p>
   </main>
 
   <script>
-    const repo = "alfaro29sebass/MiBlog"; // 🔸 cambia esto
+    const repo = "alfaro29sebass/MiBlog"; // 🔸 cámbialo
     const branch = "main";
+    const author = "Sebastian"; // 🔸 cámbialo
 
-    async function createFile(path, content, message) {
-      const token = prompt("Pega tu token de GitHub aquí:");
-      if (!token) return alert("Token requerido para publicar.");
+    async function githubFetch(path, options = {}) {
+      const token = options.token || prompt("Pega tu token de GitHub:");
+      const res = await fetch(`https://api.github.com/repos/${repo}/${path}`, {
+        ...options,
+        headers: {
+          "Authorization": `token ${token}`,
+          "Accept": "application/vnd.github.v3+json",
+          ...(options.headers || {})
+        }
+      });
+      return {res, token};
+    }
+
+    async function createOrUpdateFile(path, content, message, token) {
+      const get = await fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`, {
+        headers: {"Authorization": `token ${token}`}
+      });
+      let sha;
+      if (get.ok) {
+        const data = await get.json();
+        sha = data.sha;
+      }
 
       const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
         method: "PUT",
@@ -46,7 +64,8 @@
         body: JSON.stringify({
           message,
           content: btoa(unescape(encodeURIComponent(content))),
-          branch
+          branch,
+          sha
         })
       });
       return res;
@@ -57,21 +76,58 @@
       const excerpt = document.getElementById("excerpt").value.trim();
       const body = document.getElementById("body").value.trim();
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-
-      if (!title || !body) return alert("Falta el título o el contenido.");
-
-      const date = new Date().toISOString().slice(0,10);
-      const author = "TU_NOMBRE"; // cámbialo si quieres
-      const md = `---\ntitle: "${title}"\ndate: "${date}"\nauthor: "${author}"\n---\n\n${body}\n`;
-
-      const res = await createFile(`posts/${slug}.md`, md, `Nuevo post: ${title}`);
       const msg = document.getElementById("msg");
 
-      if (res.ok) {
-        msg.textContent = "✅ Post publicado con éxito.";
+      if (!title || !body) return alert("Falta el título o el contenido.");
+      const date = new Date().toISOString().slice(0,10);
+      const md = `---\ntitle: "${title}"\ndate: "${date}"\nauthor: "${author}"\n---\n\n${body}\n`;
+
+      msg.textContent = "📤 Publicando...";
+      const token = prompt("Pega tu token de GitHub:");
+      if (!token) return alert("Token requerido.");
+
+      // 1️⃣ Subir el nuevo post
+      const postRes = await createOrUpdateFile(`posts/${slug}.md`, md, `Nuevo post: ${title}`, token);
+      if (!postRes.ok) {
+        const err = await postRes.json();
+        msg.textContent = "❌ Error creando el post: " + (err.message || postRes.status);
+        return;
+      }
+
+      // 2️⃣ Actualizar posts.json
+      const listUrl = `https://api.github.com/repos/${repo}/contents/posts.json?ref=${branch}`;
+      const listRes = await fetch(listUrl, {headers: {"Authorization": `token ${token}`}});
+      let posts = [];
+      let sha;
+
+      if (listRes.ok) {
+        const data = await listRes.json();
+        sha = data.sha;
+        posts = JSON.parse(atob(data.content));
+      }
+
+      const newPost = {slug, title, date, author, excerpt};
+      posts.push(newPost);
+      const newJson = JSON.stringify(posts, null, 2);
+
+      const updateRes = await fetch(`https://api.github.com/repos/${repo}/contents/posts.json`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Accept": "application/vnd.github.v3+json"
+        },
+        body: JSON.stringify({
+          message: `Actualizar posts.json con ${title}`,
+          content: btoa(unescape(encodeURIComponent(newJson))),
+          branch,
+          sha
+        })
+      });
+
+      if (updateRes.ok) {
+        msg.textContent = "✅ Post publicado y lista actualizada.";
       } else {
-        const data = await res.json();
-        msg.textContent = "❌ Error: " + (data.message || "No se pudo publicar.");
+        msg.textContent = "⚠️ Post subido, pero error al actualizar posts.json.";
       }
     };
   </script>
