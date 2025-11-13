@@ -1,97 +1,65 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mi Blog - Entrada</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Post - Mi Blog</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="site-header">
-    <h1><a href="index.html">Mi Blog</a></h1>
-  </header>
-
-  <main id="content">
-    <article id="post-content">
-      <h2 id="title"></h2>
-      <p class="meta" id="meta"></p>
-      <div id="body"></div>
-    </article>
-
+  <main style="max-width:700px;margin:2rem auto">
+    <a href="index.html">← Volver al blog</a>
+    <h1 id="title"></h1>
+    <p id="meta"></p>
+    <article id="content"></article>
+    <hr>
     <section id="comments">
       <h3>Comentarios</h3>
-      <div id="utterances-container"></div>
-      <p class="comments-note">Los comentarios se publican en los Issues de GitHub. Puedes responder desde la web o desde tu cuenta en GitHub.</p>
+      <p>Próximamente aquí podrás dejar tus comentarios 💬</p>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <p>Publicado en GitHub Pages</p>
-  </footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
   <script>
-    function getSlug() {
+    async function loadPost() {
       const params = new URLSearchParams(location.search);
-      return params.get('slug');
-    }
+      const slug = params.get("slug");
+      const titleEl = document.getElementById("title");
+      const metaEl = document.getElementById("meta");
+      const contentEl = document.getElementById("content");
 
-    async function loadPost(slug) {
       if (!slug) {
-        document.getElementById('post-content').innerHTML = '<p>Post no especificado.</p>';
+        contentEl.textContent = "No se especificó el post.";
         return;
       }
-      const mdPath = `posts/${slug}.md`;
+
       try {
-        const res = await fetch(mdPath, {cache: "no-store"});
-        if (!res.ok) throw new Error('No existe el post: ' + mdPath);
-        const md = await res.text();
+        const res = await fetch(`posts/${slug}.md`);
+        if (!res.ok) throw new Error(`No existe el post: posts/${slug}.md`);
 
-        let title = '', meta = '', bodyMd = md;
-        if (md.startsWith('---')) {
-          const parts = md.split('---');
-          if (parts.length >= 3) {
-            const fm = parts[1];
-            bodyMd = parts.slice(2).join('---').trim();
-            const matchTitle = fm.match(/title:\s*(.*)/);
-            const matchDate = fm.match(/date:\s*(.*)/);
-            const matchAuthor = fm.match(/author:\s*(.*)/);
-            title = matchTitle ? matchTitle[1].trim().replace(/^["']|["']$/g,'') : '';
-            const date = matchDate ? matchDate[1].trim().replace(/^["']|["']$/g,'') : '';
-            const author = matchAuthor ? matchAuthor[1].trim().replace(/^["']|["']$/g,'') : '';
-            meta = `${date} — ${author}`;
-          }
-        }
-        if (!title) {
-          const m = bodyMd.match(/^#\s+(.*)/m);
-          title = m ? m[1].trim() : slug;
-        }
-        document.getElementById('title').textContent = title;
-        document.getElementById('meta').textContent = meta;
-        document.getElementById('body').innerHTML = marked.parse(bodyMd);
+        const text = await res.text();
+        const match = text.match(/^---([\s\S]*?)---/);
+        let metadata = {};
+        let body = text;
 
-        addUtterances();
-      } catch (err) {
-        document.getElementById('post-content').innerHTML = '<p>Error cargando post: ' + err.message + '</p>';
+        if (match) {
+          const yaml = match[1].trim().split("\n");
+          yaml.forEach(line => {
+            const [key, value] = line.split(":").map(s => s.trim().replace(/"/g, ""));
+            metadata[key] = value;
+          });
+          body = text.replace(match[0], "").trim();
+        }
+
+        titleEl.textContent = metadata.title || slug;
+        metaEl.textContent = `Publicado el ${metadata.date || "?"} por ${metadata.author || "Anónimo"}`;
+        contentEl.innerHTML = marked.parse(body);
+      } catch (e) {
+        contentEl.textContent = "Error cargando post: " + e.message;
       }
     }
 
-    function addUtterances() {
-      const repo = 'alfaro29sebass/MiBlog'; // 🔸 cambia esto por tu usuario/repositorio
-      const script = document.createElement('script');
-      script.src = 'https://utteranc.es/client.js';
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.setAttribute('repo', repo);
-      script.setAttribute('issue-term', 'pathname');
-      script.setAttribute('label', 'comentario');
-      script.setAttribute('theme', 'github-light');
-      document.getElementById('utterances-container').appendChild(script);
-    }
-
-    const slug = getSlug();
-    loadPost(slug);
+    loadPost();
   </script>
 </body>
 </html>
