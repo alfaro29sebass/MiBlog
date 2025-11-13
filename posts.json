@@ -4,6 +4,13 @@
     "title": "Hola mundo",
     "date": "2025-11-13",
     "author": "Tu Nombre",
-    "excerpt": "Primera entrada de ejemplo. Explica brevemente de qué va el blog."
+    "excerpt": "Primera entrada de ejemplo. Explica brevemente de quÃ© va el blog."
+  },
+  {
+    "slug": "hola",
+    "title": "Hola",
+    "date": "2025-11-13",
+    "author": "Sebastian",
+    "excerpt": "hola"
   }
 ]
